@@ -1,0 +1,94 @@
+
+\documentclass[10pt]{article}
+\usepackage{geometry}
+\geometry{a4paper}
+
+\usepackage{graphicx}
+
+\usepackage[parfill]{parskip}
+
+\usepackage{amsthm}
+\usepackage[cm]{fullpage}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\usepackage{listings}
+\def\ContinueLineNumber{\lstset{firstnumber=last}}
+\def\StartLineAt#1{\lstset{firstnumber=#1}}
+\let\numberLineAt\StartLineAt
+
+\lstset{
+  basicstyle=\ttfamily,
+  breaklines=true,
+  frame=none,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{black!80},
+  xleftmargin=.153in,
+  language=Prolog,
+  deletekeywords={clause,not,var},
+  commentstyle=\color{black!40},
+  escapechar=|,
+  aboveskip=\smallskipamount,
+  belowskip=\smallskipamount,
+  backgroundcolor=\color{black!10},
+}
+
+\theoremstyle{definition}
+\newtheorem{exercise}{Exercise}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+%%% USE THIS TO SHOW SOLUTIONS
+\newcommand{\innersolutions}[1]{#1}
+%%% USE THIS TO HIDE SOLUTIONS
+%\newcommand{\innersolutions}[1]{}
+%%%
+
+
+\newcommand{\separator}[0]{
+  \textcolor{black!80}{\rule{\textwidth}{1.5pt}}
+}
+
+\title{\sffamily \bfseries Knowledge Representation and Reasoning 2022\\
+\sffamily \bfseries {\Large Homework assignment \#$x$}}
+\author{Firstname Lastname (student number 0000000), Firstname Lastname (student number 0000000)}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{exercise}
+Here you can write your solution for Exercise~1.
+
+Perhaps you might want to mention an answer set program:
+
+\begin{lstlisting}
+a :- not b.
+b :- not a.
+c :- not d.
+d :- not c.
+\end{lstlisting}
+
+And another one:
+
+\ContinueLineNumber
+\begin{lstlisting}
+e :- not f.
+f :- not e.
+\end{lstlisting}
+\end{exercise}
+
+\separator{}
+
+\begin{exercise}
+Here you can write your solution for another exercise.
+\begin{enumerate}[label=(\alph*)]
+  \item This is the first part.
+  \item And this is the second part.
+\end{enumerate}
+\end{exercise}
+
+\end{document}  
