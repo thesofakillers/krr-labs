@@ -101,21 +101,22 @@ def check_solution(sudoku, k, solution):
     for row in solution:
         if set(row) != set(range(1, k**2+1)):
             return False
+    print("each row in the solution has different values")
     # Check if each row in the solution has different values
     for col in range(0, k**2):
         if {solution[row][col]
                 for row in range(0, k**2)
            } != set(range(1, k**2+1)):
             return False
-    # Check the 'bomb' constraints
-    for row1, col1 in itertools.product(range(0, k**2), repeat=2):
-        for row_add, col_add in itertools.product([-1, 0, 1], repeat=2):
-            if row_add != 0 or col_add != 0:
-                row2 = row1 + row_add
-                col2 = col1 + col_add
-                if 0 <= row2 < k**2 and 0 <= col2 < k**2:
-                    if solution[row1][col1] == solution[row2][col2]:
-                        return False
+    print("each col in the solution has different values")
+    # Check if each block in the solution has different values
+    for block_row, block_col in itertools.product(range(0, k), repeat=2):
+        if {solution[block_row*k + inner_row][block_col*k + inner_col]
+                for inner_row, inner_col
+                in itertools.product(range(0, k), repeat=2)
+           } != set(range(1, k**2+1)):
+            return False
+    print("each block in the solution has different values")
     # Check the 'knight' constraints
     for row1, col1 in itertools.product(range(0, k**2), repeat=2):
         for row_add, col_add in [(1, 2), (1, -2), (-1, 2), (-1, -2),
@@ -125,14 +126,19 @@ def check_solution(sudoku, k, solution):
                 col2 = col1 + col_add
                 if 0 <= row2 < k**2 and 0 <= col2 < k**2:
                     if solution[row1][col1] == solution[row2][col2]:
+                        print(row1, col1)
                         return False
-    # Check if each block in the solution has different values
-    for block_row, block_col in itertools.product(range(0, k), repeat=2):
-        if {solution[block_row*k + inner_row][block_col*k + inner_col]
-                for inner_row, inner_col
-                in itertools.product(range(0, k), repeat=2)
-           } != set(range(1, k**2+1)):
-            return False
+    print("the 'knight' constraints are satisfied")
+    # Check the 'bomb' constraints
+    for row1, col1 in itertools.product(range(0, k**2), repeat=2):
+        for row_add, col_add in itertools.product([-1, 0, 1], repeat=2):
+            if row_add != 0 or col_add != 0:
+                row2 = row1 + row_add
+                col2 = col1 + col_add
+                if 0 <= row2 < k**2 and 0 <= col2 < k**2:
+                    if solution[row1][col1] == solution[row2][col2]:
+                        return False
+    print("the 'bomb' constraints are satisfied")
     # Check if the solution matches the input
     for row, col in itertools.product(range(0, k**2), repeat=2):
         if sudoku[row][col] != 0 and sudoku[row][col] != solution[row][col]:
