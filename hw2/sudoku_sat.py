@@ -10,7 +10,85 @@ from sudoku_func import *
 #!{sys.executable} -m pip install python-sat
 import pysat
 from pysat.formula import CNF
-from pysat.solvers import MinisatGH, Glucose3
+from pysat.solvers import MinisatGH
+
+
+def assignment_to_sudoku(assignment, vpool, max_value, fillable_sudoku=None):
+    """
+    Converts a pysat assignment to a sudoku array
+    """
+    if fillable_sudoku is None:
+        solution = [[0 for _ in range(max_value)] for _ in range(max_value)]
+    else:
+        solution = deepcopy(fillable_sudoku)
+    for variable in assignment:
+        if variable > 0:
+            (i, j, val) = vpool.obj(variable)
+            solution[i][j] = val
+    return solution
+
+
+def ensure_diff_to_target(target, group, cnf, vpool, min_value, max_value):
+    """
+    Ensures that each cell in the group has a different value from the target cell
+    """
+    target_i, target_j = target
+    for value in range(min_value, max_value + 1):
+        for i, j in group:
+            cnf.append(
+                [
+                    -1 * vpool.id((target_i, target_j, value)),
+                    -1 * vpool.id((i, j, value)),
+                ]
+            )
+
+
+def ensure_group_set(
+    cells_by_group, cnf, vpool, min_value, max_value, complete_coverage=False
+):
+    """
+    Ensures each group of cells in the cell_by_group array
+    is a set such that each cell has a unique value within that group.
+
+    same as (!p1 | !p2) & (!p1 | !p3) & (!p3 | !p2) & (p1 | p2 | p3) ...
+
+    updates the passed cnf with new clauses in place.
+    """
+    for cell_group in cells_by_group:
+        for value in range(min_value, max_value + 1):
+            if complete_coverage:
+                # this clause is typically already covered
+                cnf.append([vpool.id((i, j, value)) for (i, j) in cell_group])
+            for cell_pair in itertools.combinations(cell_group, 2):
+                cnf.append([-1 * vpool.id((i, j, value)) for (i, j) in cell_pair])
+
+
+def find_adj_diag(cell, n, include_cell=False):
+    """finds adjacent diagonal cells of a given cell in n*n matrix"""
+    row, col = cell
+    adj_diag = [
+        (row + i, col + j)
+        for i in (-1, 1)
+        for j in (-1, 1)
+        if 0 <= row + i < n and 0 <= col + j < n
+    ]
+    if include_cell:
+        adj_diag.append(cell)
+    return adj_diag
+
+
+def find_knights(cell, n, include_cell=False):
+    """finds knight's move cells of a given cell in n*n matrix"""
+    row, col = cell
+    knights = [
+        (row + i, col + j)
+        for i in [-2, -1, 1, 2]
+        for j in [-2, -1, 1, 2]
+        if 0 <= row + i < n and 0 <= col + j < n and abs(j) != abs(i)
+    ]
+    if include_cell:
+        knights.append(cell)
+    return knights
 
 
 def solve_sudoku_SAT(sudoku: List[List[int]], k: int):
@@ -33,38 +111,16 @@ def solve_sudoku_SAT(sudoku: List[List[int]], k: int):
     # https://krr-talk.computational-complexity.nl/t/idpool-for-question-1/235/2
     vpool = pysat.formula.IDPool()  # we use tuples of (row, col, value)
     cnf = CNF()
-    # {{{ ------------------------- Helper Functions -------------------------
-    def find_adjacents(cell, n, include_cell=False):
-        """finds adjacent cells of a given cell in n*n matrix"""
-        row, col = cell
-        adjacents = [
-            (row + i, col + j)
-            for i in [-1, 0, 1]
-            for j in [-1, 0, 1]
-            if 0 <= row + i < n
-            and 0 <= col + j < n
-            and ((i, j) != (0, 0) if not include_cell else True)
-        ]
-        return adjacents
-
-    def find_knights(cell, n, include_cell=False):
-        """finds knight's move cells of a given cell in n*n matrix"""
-        row, col = cell
-        knights = [
-            (row + i, col + j)
-            for i in [-2, -1, 1, 2]
-            for j in [-2, -1, 1, 2]
-            if 0 <= row + i < n and 0 <= col + j < n and abs(j) != abs(i)
-        ]
-        if include_cell:
-            knights.append(cell)
-        return knights
-
-    # }}}
-    # {{{---------------------- encoding the problem into SAT ---------------------
+    # {{{ -------------------- Useful precomputations --------------------------
     cells = list(itertools.product(range(max_value), repeat=2))
     non_border_cells = [
         cell for cell in cells if (0 not in cell) and (max_value - 1 not in cell)
+    ]
+    centers_idxs = range(max_value)[1::k]
+    non_block_center_cells = [
+        cell
+        for cell in non_border_cells
+        if cell[0] not in centers_idxs or cell[1] not in centers_idxs
     ]
     cells_by_row = [[cell for cell in cells if cell[0] == j] for j in range(max_value)]
     cells_by_col = [[cell for cell in cells if cell[1] == j] for j in range(max_value)]
@@ -77,11 +133,12 @@ def solve_sudoku_SAT(sudoku: List[List[int]], k: int):
         for j in range(k)
         for i in range(k)
     ]
-    cells_by_adjacency = [
-        find_adjacents(cell, max_value, True) for cell in non_border_cells
-    ]
-    cells_by_knights = [find_knights(cell, max_value, True) for cell in cells]
-
+    cells_by_adj_diag = {
+        cell: find_adj_diag(cell, max_value, False) for cell in non_block_center_cells
+    }
+    cells_by_knights = {cell: find_knights(cell, max_value, False) for cell in cells}
+    # }}}
+    # {{{---------------------- encoding the problem into SAT ---------------------
     # Each cell contains a value between 1 and k*k
     for (i, j) in cells:
         input_value = sudoku[i][j]
@@ -94,65 +151,34 @@ def solve_sudoku_SAT(sudoku: List[List[int]], k: int):
             cnf.append(
                 [vpool.id((i, j, val)) for val in range(min_value, max_value + 1)]
             )
-
-    def ensure_uniques(cells_by_group):
-        """
-        Each two different cells in the same group must contain different values.
-        same as (!p1 | !p2) & (!p1 | !p3) & (!p3 | !p2) & (p1 | p2 | p3) ...
-        """
-        for cell_group in cells_by_group:
-            for value in range(min_value, max_value + 1):
-                # commenting out the following line as it is covered
-                # cnf.append([vpool.id((i, j, value)) for (i, j) in cell_group])
-                for cell_pair in itertools.combinations(cell_group, 2):
-                    cnf.append([-1 * vpool.id((i, j, value)) for (i, j) in cell_pair])
-
     # Each two different cells in the same row must contain different values.
-    ensure_uniques(cells_by_row)
+    ensure_group_set(cells_by_row, cnf, vpool, min_value, max_value)
     # Each two different cells in the same column must contain different values.
-    ensure_uniques(cells_by_col)
+    ensure_group_set(cells_by_col, cnf, vpool, min_value, max_value)
     # Each two different cells in the same k*k block must contain different values
-    ensure_uniques(cells_by_block)
-    # TODO: this is about ADJACENCY, not uniqueness in set. need new func
+    ensure_group_set(cells_by_block, cnf, vpool, min_value, max_value)
     # Each two different cells that are directly adjacent must contain diff values
-    ensure_uniques(cells_by_adjacency)
+    for cell, adj_cells in cells_by_adj_diag.items():
+        ensure_diff_to_target(cell, adj_cells, cnf, vpool, min_value, max_value)
     # Each two diff cells that can be reached by knights move must contain diff values
-    ensure_uniques(cells_by_knights)
+    for cell, knight_cells in cells_by_knights.items():
+        ensure_diff_to_target(cell, knight_cells, cnf, vpool, min_value, max_value)
     #  }}}
-    #  {{{--------------- calling a SAT solver -----------------------------------
-    print(len(cnf.clauses))
-    assignments = []
-    counter = 0
+    #  {{{------ calling a SAT solver and converting assingment to sudoku----------
     with MinisatGH(bootstrap_with=cnf.clauses) as m:
         solvable = True
         while solvable:
             solvable = m.solve()
-            print(solvable)
-            print(m.accum_stats())
             if not solvable:
                 # there are no remaining assignments
                 break
             else:
-                counter += 1
                 assignment = m.get_model()
-                assignments.append(assignment)
-                print(counter)
+                solution = assignment_to_sudoku(assignment, vpool, max_value, sudoku)
                 # add negated assignment as a disjunction
                 m.add_clause([-1 * var for var in assignment])
-                # TODO: remember to remove this break
-                break
+                yield solution
     #  }}}
-    # {{{--------- retrieving the solutions forthe sudoku input -------------------
-    for assignment in assignments:
-        # initialize list of lists
-        solution = deepcopy(sudoku)
-        for variable in assignment:
-            if variable > 0:
-                (i, j, val) = vpool.obj(variable)
-                solution[i][j] = val
-        print(pretty_repr(solution, k))
-        yield solution
-    # }}}
 
 
 if __name__ == "__main__":
