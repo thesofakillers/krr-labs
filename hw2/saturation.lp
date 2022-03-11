@@ -1,24 +1,14 @@
 #const k=3.
+#const p=10.
 
 row(0..k**2-1).
 col(0..k**2-1).
 val(1..k**2).
 
-% current problem
-place(0,0,3).
-place(1,0,2).
-place(3,0,9).
-place(4,0,8).
-place(5,0,4).
-place(7,0,7).
-place(8,0,1).
-place(0,1,9).
-place(1,1,8).
-place(5,1,1).
-
-% generate with only one value per cell
+% generate a solution
 1 {place(R, C, V) : val(V)} 1 :- row(R), col(C).
 
+% definitions and restrictions for sudoku solutions
 % helper
 valid(R, C) :- row(R), col(C).
 
@@ -33,14 +23,12 @@ kreachable(R, C, AR, AC) :- valid(R, C), valid(AR, AC),
     |C - AC| = 1, |R - AR| <= 1.
 kreachable(R, C, AR, AC) :- valid(R, C), valid(AR, AC), 
     |R - AR| = 1, |C - AC| <= 1.
-kreachable(R, C, AR, AC) :- kreachable(AR, AC, R, C).
 
 % define what is reachable with knight move
 nreachable(R, C, AR, AC) :- valid(R, C), valid(AR, AC), 
     |R - AR| == 1, |C - AC| == 2.
 nreachable(R, C, AR, AC) :- valid(R, C), valid(AR, AC), 
     |R - AR| == 2, |C - AC| == 1.
-nreachable(R, C, AR, AC) :- nreachable(AR, AC, R, C).
 
 % conbine king and knight reachable into one predicate
 reachable(R, C, AR, AC) :- nreachable(AR, AC, R, C).
@@ -59,4 +47,41 @@ reachable(R, C, AR, AC) :- kreachable(AR, AC, R, C).
 % no two reachable values the same
 :- place(R, C, V), place(R1, C1, V), reachable(R, C, R1, C1).
 
-#show place/3.
+
+% hide empty cells
+{ hide(R, C) : valid(R, C) }.
+on_board(R, C, V) :- not hide(R, C), place(R, C, V).
+
+% want exactly p numbers on board
+:- not p { on_board(R, C, V) : valid(R, C), val(V) } p.
+
+
+% saturation
+% generate new solutions
+new_place(R, C, V) : val(V) :- valid(R, C).
+
+
+% incorrect new solutions if different from values on board or the same as old solution
+incorrect :- on_board(R, C, V), new_place(R, C, W), V != W.
+incorrect :- new_place(R, C, V) : place(R, C, V).
+
+
+% incorrect new solution if same row, column, block, reachable
+incorrect :- new_place(R1, C, V), new_place(R2, C, V), R1 != R2,
+    valid(R1, C), valid(R2, C).
+incorrect :- new_place(R, C1, V), new_place(R, C2, V), C1 != C2,
+    valid(R, C1), valid(R, C2).
+incorrect :- new_place(R, C, V), new_place(R1, C1, V),
+    in_block(R, C, SC, EC),  in_block(R1, C1, SC, EC),
+    R != R1, C != C1, valid(R, C), valid(R1, C1).
+incorrect :- new_place(R, C, V), new_place(R1, C1, V), reachable(R, C, R1, C1),
+    valid(R, C), valid(R1, C1).
+
+% finish saturation
+saturate :- incorrect.
+incorrect :- saturate.
+new_place(R, C, V) :- val(V), valid(R, C), saturate.
+:- not saturate.
+
+
+#show on_board/3.
