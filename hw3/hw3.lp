@@ -44,19 +44,33 @@ edge(11,12).
 % Edges are undirected, so include their reverse
 edge(X,Y) :- edge(Y,X), node(Y), node(X).
 
-% trucks
 #const max_charge = 10.
-% truck id, node, at time
-truck(1, 11, 1).
-truck(2, 12, 1).
-truck(3, 13, 1).
+
+% truck ids and warehouse capacity
+truck_id(1..3).
+warehouse_capacity(0..5).
+
+% charging station at node 1 and 2
+station(1). 
+station(2). 
+
+% parking slot at nodes 11, 12, 13
+parking(11). 
+parking(12). 
+parking(13).
+
+% delivery locations at nodes 3 and 6
+deliver_location(3;6).
+
+% warehouse at node 10
+warehouse_location(10).
 
 %*
 TIME STEPS:
 - Represent the different time steps (up to some upper bound)
 *%
 
-#const t=100. % This is an upper bound on the number of time steps needed
+#const t=25. % This is an upper bound on the number of time steps needed
 possible_time(1..t).
 { time(T) : possible_time(T) }.
 :- not time(1).
@@ -80,6 +94,16 @@ action(move(N)) :- node(N).
 action(unload(N)) :- node(N) .
 % load a unit onto a truck at node N
 action(load(N)) :- node(N) .
+% charge at node N
+action(charge(N)) :- node(N) .
+
+% Declare what we will treat as fluents
+fluent(truck(TID, N)) :- truck_id(TID), node(N).
+fluent(warehouse(N, Curr)) :- warehouse_location(N), warehouse_capacity(Curr).
+fluent(cargo(TID,Curr,Max)) :- truck_id(TID), warehouse_capacity(Curr), warehouse_capacity(Max).
+fluent(deliver(N,Req)) :- deliver_location(N), warehouse_capacity(Req).
+fluent(battery(TID,Curr)) :- truck_id(TID),Curr = 0..max_charge.
+
 
 
 %*
@@ -90,7 +114,14 @@ GENERATE A SEQUENCE OF ACTIONS:
 *%
 % We perform exactly one action at each time step per truck
 1 { do(A, TID, T) : action(A) } 1 :- 
-    time(T), truck(TID, _, _), T < M, max_time(M).
+    time(T), truck_id(TID), T < M, max_time(M).
+
+% Fluents stay true, unless explicitly made false
+state(T,F) :- time(T),
+    fluent(F), state(T-1,F), not make_false(T,F).
+% Fluents that are explicitly made true, become true
+state(T,F) :- time(T),
+    fluent(F), make_true(T,F).
 
 %*
 INITIAL STATE:
@@ -98,22 +129,21 @@ INITIAL STATE:
 
 [EXPLAIN YOUR CODE USING SHORT INLINE COMMENTS]
 *%
-% charging station at node 1 and 2
-station(1). 
-station(2). 
-% warehouse at node 10 with 5 packages at timestep 1
-warehouse(10, 5, 1). 
-% (position, number of packages required) of deliver goal at timestep 1
-deliver(3, 2, 1).
-deliver(6, 2, 1).
-% parking slot at nodes 11, 12, 13
-parking(11). 
-parking(12). 
-parking(13). 
-% cargo of truck id, current load, max load, timestep
-cargo(1, 0, 1, 1) .
-cargo(2, 0, 2, 1) .
-cargo(3, 0, 3, 1) .
+
+% initial state of trucks
+state(1, truck(TID, 10+TID)) :- truck_id(TID).
+% warehouse at node 10 with 5 packages
+state(1, warehouse(10, 5)).
+% (position, number of packages required) of deliver goal
+state(1, deliver(L, 2)) :- deliver_location(L).
+% cargo of truck id, current load, max load
+state(1, cargo(TID, 0, TID)) :- truck_id(TID).
+
+% battery of truck id, initial charge level.
+state(1, battery(1, 6)).
+state(1, battery(2, 7)).
+state(1, battery(3, 10)).
+
 
 %*
 SUBSEQUENT STATES OF THE WORLD:
@@ -122,29 +152,56 @@ SUBSEQUENT STATES OF THE WORLD:
 Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
-% when we wait, we stay in the same node in the next time step
-truck(TID, N, TStep+1) :- do(wait, TID, TStep), truck(TID, N, TStep).
-% when we move, we move to the target node in the next time step
-truck(TID,TN, TStep+1) :- 
-  do(move(TN), TID, TStep), truck(TID, N, TStep).
-% when we load, our cargo increases, the node cargo decreases
-cargo(TID, Curr+1, Max, TStep+1) :- 
+% do not need to describe what happens with wait because fluents take care of it (i think)
+
+
+% when we move, we move to the target node in the next time step. Make stuff that keeps node the same false.
+make_true(TStep+1, truck(TID,TN)) :- 
+  do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
+make_false(TStep+1, truck(TID,N)) :- 
+  do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
+
+% when we load, our cargo increases, the node cargo decreases. Make stuff that keeps cargo the same false.
+make_true(TStep+1, cargo(TID, Curr+1, Max)) :- 
   do(load(N), TID, TStep), 
-  truck(TID, N, TStep), 
-  cargo(TID, Curr, Max, TStep).
-warehouse(N, Curr-1, TStep+1) :- 
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_false(TStep+1, cargo(TID, Curr, Max)) :- 
+  do(load(N), TID, TStep), 
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_true(TStep+1, warehouse(N, Curr-1)) :- 
   do(load(N), TID, TStep),
-  truck(TID, N, TStep),
-  warehouse(N, Curr, TStep) .
-% when we unload, our cargo decreases, the node required cargo increases
-cargo(TID, Curr-1, Max, TStep+1) :-
+  state(TStep, truck(TID, N)),
+  state(TStep, warehouse(N, Curr)) .
+make_false(TStep+1, warehouse(N, Curr)) :- 
+  do(load(N), TID, TStep), 
+  state(TStep, truck(TID, N)),
+  state(TStep, warehouse(N, Curr)).
+
+% when we unload, our cargo decreases, the node required cargo increases. Make stuff that keeps cargo the same false.
+make_true(TStep+1, cargo(TID, Curr-1, Max)) :- 
   do(unload(N), TID, TStep),
-  truck(TID, N, TStep),
-  cargo(TID, Curr, Max, TStep).
-deliver(N, Req-1, TStep+1) :- 
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_false(TStep+1, cargo(TID, Curr, Max)) :- 
   do(unload(N), TID, TStep),
-  truck(TID, N, TStep),
-  deliver(N, Req, TStep) .
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_true(TStep+1, deliver(N, Req-1)) :- 
+  do(unload(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, deliver(N, Req)) .
+make_false(TStep+1, deliver(N, Req)) :- 
+  do(unload(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, deliver(N, Req)) .
+
+
+% when we move, battery decreases, TODO
+
+
+% when we charge, battery increases, TODO
 
 
 %*
@@ -155,34 +212,39 @@ Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
 % we can only move to adjacent nodes
-:- do(move(TN), TID, TStep), truck(TID, N, TStep), not edge(N, TN).
+:- do(move(TN), TID, TStep), state(TStep, truck(TID, N)), not edge(N, TN).
 % we cannot move to an occupied node
 :- do(move(TN), TIDA, TStep), do(move(TN), TIDB, TStep), TIDA != TIDB.
 :- do(move(TN), TIDA, TStep), 
-    do(wait, TIDB, TStep), 
-    truck(TIDB, TN, TStep),
+    not do(move, TIDB, TStep), 
+    state(TStep, truck(TIDB, TN)),
     TIDA != TIDB.
 % we cannot move through a busy edge
 % helper rule
-busy_edge(N, TN, TID) :- do(move(TN), _, TID), truck(TID, N, _) .
+busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID, N)) .
 :-  do(move(N), TIDA, TStep), 
-    busy_edge(N, TN, TIDB), 
+    busy_edge(N, TN, TIDB, TStep), 
     TIDA != TIDB, 
-    truck(TIDA, TN, TStep).
+    state(TStep, truck(TIDA, TN)).
 
 % can only load at warehouse
-:- do(load(N), _, TStep), warehouse(M, _, TStep), N != M .
+:- do(load(N), TID, TStep), not warehouse_location(N).
 % can only load when warehouse not empty
-:- do(load(_), _, TStep), warehouse(_, C, TStep), C < 1 .
+:- do(load(N), _, TStep), state(TStep, warehouse(N, C)), C < 1 .
 % can only load when we have space to do so
-:- do(load(_), TID, TStep), cargo(TID, Curr, Max, TStep), Curr + 1 > Max .
+:- do(load(_), TID, TStep), state(TStep, cargo(TID, Curr, Max)), Curr == Max .
 
-% can only unload at deliver
-:- do(unload(N), _, TStep), deliver(M, _, TStep), N != M.
+% can only unload at deliver, this constraint breaks because there's two unload places!!
+:- do(unload(N), TID, TStep), not deliver_location(N).
 % can only unload when deliver needs it 
-:- do(unload(N), _, TStep), deliver(N, R, TStep), R < 1 .
+:- do(unload(N), _, TStep), state(TStep, deliver(N, R)), R < 0 .
 % can only unload when we have package to unload
-:- do(unload(N), TID, TStep), cargo(TID, Curr, _, TStep), Curr < 1 .
+:- do(unload(N), TID, TStep), state(TStep, cargo(TID, Curr, _)), Curr == 0 .
+
+% can only charge at station, TODO
+% can only charge if battery is not full, TODO
+% cannot move if battery == 0, TODO
+
 
 
 %*
@@ -192,13 +254,21 @@ GOAL CONDITIONS:
 Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
-%all_delivered(T) :- time(T), deliver(3, 0, T), deliver(6, 0, T) .
-all_parked(T):- time(T), truck(_, N, T) : parking(N) .
+all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
+all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
+all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
+
+
+% helper for station reachable by truck with current charge, TODO
+
+% all_reachable: that all trucks can reach one charging station, TODO
+
 
 goal_reached(T) :- 
   time(T), 
-%  all_delivered(T),
-  all_parked(T) .
+  all_delivered(T),
+  all_parked(T),
+  all_empty(T) .
 
 :- max_time(M), not goal_reached(M).
 :- max_time(M), goal_reached(T), time(T), T < M .
@@ -223,11 +293,12 @@ OPTIONAL: ADDITIONAL RULES
 Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
-#show do/3 .
+
 
 
 
 % tests
+#show do/3.
 %*
 THE END
 *%
