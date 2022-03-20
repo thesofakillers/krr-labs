@@ -89,12 +89,15 @@ action(move(N)) :- node(N).
 action(unload(N)) :- node(N) .
 % load a unit onto a truck at node N
 action(load(N)) :- node(N) .
+% charge at node N
+action(charge(N)) :- node(N) .
 
 % Declare what we will treat as fluents
 fluent(truck(TID, N)) :- truck_id(TID), node(N).
 fluent(warehouse(N, Curr)) :- warehouse_location(N), warehouse_capacity(Curr).
 fluent(cargo(TID,Curr,Max)) :- truck_id(TID), warehouse_capacity(Curr), warehouse_capacity(Max).
 fluent(deliver(N,Req)) :- deliver_location(N), warehouse_capacity(Req).
+fluent(battery(TID,Curr)) :- truck_id(TID),Curr = 0..max_charge.
 
 
 
@@ -131,6 +134,12 @@ state(1, deliver(L, 2)) :- deliver_location(L).
 % cargo of truck id, current load, max load
 state(1, cargo(TID, 0, TID)) :- truck_id(TID).
 
+% battery of truck id, initial charge level.
+state(1, battery(1, 6)).
+state(1, battery(2, 7)).
+state(1, battery(3, 10)).
+
+
 %*
 SUBSEQUENT STATES OF THE WORLD:
 - Encode the subsequent states, based on the actions taken
@@ -141,13 +150,13 @@ Explanation (max 100 words):
 % do not need to describe what happens with wait because fluents take care of it (i think)
 
 
-% when we move, we move to the target node in the next time step
+% when we move, we move to the target node in the next time step. Make stuff that keeps node the same false.
 make_true(TStep+1, truck(TID,TN)) :- 
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
 make_false(TStep+1, truck(TID,N)) :- 
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
-% when we load, our cargo increases, the node cargo decreases. 
-% I do not think we need to enforce truck state, that's taken care of by constraints.
+
+% when we load, our cargo increases, the node cargo decreases. Make stuff that keeps cargo the same false.
 make_true(TStep+1, cargo(TID, Curr+1, Max)) :- 
   do(load(N), TID, TStep), 
   state(TStep, truck(TID, N)),
@@ -165,7 +174,7 @@ make_false(TStep+1, warehouse(N, Curr)) :-
   state(TStep, truck(TID, N)),
   state(TStep, warehouse(N, Curr)).
 
-% when we unload, our cargo decreases, the node required cargo increases
+% when we unload, our cargo decreases, the node required cargo increases. Make stuff that keeps cargo the same false.
 make_true(TStep+1, cargo(TID, Curr-1, Max)) :- 
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
@@ -185,6 +194,9 @@ make_false(TStep+1, deliver(N, Req)) :-
 
 
 % when we move, battery decreases, TODO
+
+
+% when we charge, battery increases, TODO
 
 
 %*
@@ -224,6 +236,11 @@ busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID
 % can only unload when we have package to unload
 :- do(unload(N), TID, TStep), state(TStep, cargo(TID, Curr, _)), Curr == 0 .
 
+% can only charge at station, TODO
+% can only charge if battery is not full, TODO
+% cannot move if battery == 0, TODO
+
+
 
 %*
 GOAL CONDITIONS:
@@ -235,6 +252,12 @@ Explanation (max 100 words):
 all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
 all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
 all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
+
+
+% helper for station reachable by truck with current charge, TODO
+
+% all_reachable: that all trucks can reach one charging station, TODO
+
 
 goal_reached(T) :- 
   time(T), 
