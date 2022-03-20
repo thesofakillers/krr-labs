@@ -51,13 +51,10 @@ truck_id(1..3).
 warehouse_capacity(0..5).
 
 % charging station at node 1 and 2
-station(1). 
-station(2). 
+station(1;2). 
 
 % parking slot at nodes 11, 12, 13
-parking(11). 
-parking(12). 
-parking(13).
+parking(11..13). 
 
 % delivery locations at nodes 3 and 6
 deliver_location(3;6).
