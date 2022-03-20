@@ -55,7 +55,10 @@ station(2).
 % parking slot at nodes 11, 12, 13
 parking(11). 
 parking(12). 
-parking(13). 
+parking(13).
+
+deliver_location(3;6).
+warehouse_location(10).
 
 %*
 TIME STEPS:
@@ -89,9 +92,9 @@ action(load(N)) :- node(N) .
 
 % Declare what we will treat as fluents
 fluent(truck(TID, N)) :- truck_id(TID), node(N).
-fluent(warehouse(N, Curr)) :- node(N), warehouse_capacity(Curr).
+fluent(warehouse(N, Curr)) :- warehouse_location(N), warehouse_capacity(Curr).
 fluent(cargo(TID,Curr,Max)) :- truck_id(TID), warehouse_capacity(Curr), warehouse_capacity(Max).
-fluent(deliver(N,Req)) :- node(N), warehouse_capacity(Req).
+fluent(deliver(N,Req)) :- deliver_location(N), warehouse_capacity(Req).
 
 
 
@@ -124,8 +127,7 @@ state(1, truck(TID, 10+TID)) :- truck_id(TID).
 % warehouse at node 10 with 5 packages
 state(1, warehouse(10, 5)).
 % (position, number of packages required) of deliver goal
-state(1, deliver(3, 2)).
-state(1, deliver(6, 2)).
+state(1, deliver(L, 2)) :- deliver_location(L).
 % cargo of truck id, current load, max load
 state(1, cargo(TID, 0, TID)) :- truck_id(TID).
 
@@ -209,14 +211,14 @@ busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID
     state(TStep, truck(TIDA, TN)).
 
 % can only load at warehouse
-:- do(load(N), _, TStep), state(TStep, warehouse(M, _)), N != M .
+:- do(load(N), TID, TStep), not warehouse_location(N).
 % can only load when warehouse not empty
 :- do(load(N), _, TStep), state(TStep, warehouse(N, C)), C < 1 .
 % can only load when we have space to do so
 :- do(load(_), TID, TStep), state(TStep, cargo(TID, Curr, Max)), Curr == Max .
 
-% can only unload at deliver, this constraint breaks everything?????
-% :- do(unload(N), _, TStep), state(TStep, deliver(M, _)), N != M.
+% can only unload at deliver, this constraint breaks because there's two unload places!!
+:- do(unload(N), TID, TStep), not deliver_location(N).
 % can only unload when deliver needs it 
 :- do(unload(N), _, TStep), state(TStep, deliver(N, R)), R < 0 .
 % can only unload when we have package to unload
@@ -230,9 +232,7 @@ GOAL CONDITIONS:
 Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
-all_delivered(T) :- time(T), 
-state(T, deliver(3, 0)), 
-state(T, deliver(6, 0)) .
+all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
 all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
 all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
 
@@ -271,7 +271,6 @@ Explanation (max 100 words):
 
 % tests
 #show do/3.
-#show state/2.
 %*
 THE END
 *%
