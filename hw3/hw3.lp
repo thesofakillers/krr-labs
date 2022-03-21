@@ -20,30 +20,31 @@ INPUT REPRESENTATION:
 % there are 13 nodes
 node(1..13).
 % and they are connected as such
-edge(1,3). 
-edge(1,4). 
-edge(2,4). 
-edge(2,5). 
-edge(3,4). 
-edge(3,7). 
-edge(4,5). 
+edge(1,3).
+edge(1,4).
+edge(2,4).
+edge(2,5).
+edge(3,4).
+edge(3,7).
+edge(4,5).
 edge(4,7).
-edge(4,8). 
+edge(4,8).
 edge(5,8).
-edge(5,9). 
-edge(5,6). 
-edge(6,10). 
-edge(7,8). 
-edge(7,11). 
+edge(5,9).
+edge(5,6).
+edge(6,10).
+edge(7,8).
+edge(7,11).
 edge(8,9).
-edge(9,10). 
-edge(10,13). 
-edge(12,13). 
+edge(9,10).
+edge(10,13).
+edge(12,13).
 edge(11,12).
 
 % Edges are undirected, so include their reverse
 edge(X,Y) :- edge(Y,X), node(Y), node(X).
 
+% maximum charge of any truck
 #const max_charge = 10.
 
 % truck ids and warehouse capacity
@@ -51,10 +52,10 @@ truck_id(1..3).
 warehouse_capacity(0..5).
 
 % charging station at node 1 and 2
-station(1;2). 
+station(1;2).
 
 % parking slot at nodes 11, 12, 13
-parking(11..13). 
+parking(11..13).
 
 % delivery locations at nodes 3 and 6
 deliver_location(3;6).
@@ -72,8 +73,8 @@ possible_time(1..t).
 { time(T) : possible_time(T) }.
 :- not time(1).
 :- possible_time(T), possible_time(T+1), not time(T), time(T+1).
-
-max_time(D) :- D = #max {T : time(T)}. % encode largest time value
+% encode largest time value
+max_time(D) :- D = #max {T : time(T)}.
 
 %*
 ACTIONS:
@@ -84,9 +85,9 @@ ACTIONS:
 % here we declare the possible actions and their inputs
 % the do predicate (lower) handles when and who does what
 % wait is therefore 0-ary
-action(wait). 
+action(wait).
 % move to a target node
-action(move(N)) :- node(N).  
+action(move(N)) :- node(N).
 % unload a unit from a truck at node N
 action(unload(N)) :- node(N) .
 % load a unit onto a truck at node N
@@ -110,7 +111,7 @@ GENERATE A SEQUENCE OF ACTIONS:
 [EXPLAIN YOUR CODE USING SHORT INLINE COMMENTS]
 *%
 % We perform exactly one action at each time step per truck
-1 { do(A, TID, T) : action(A) } 1 :- 
+1 { do(A, TID, T) : action(A) } 1 :-
     time(T), truck_id(TID), T < M, max_time(M).
 
 % Fluents stay true, unless explicitly made false
@@ -152,44 +153,47 @@ Explanation (max 100 words):
 % do not need to describe what happens with wait because fluents take care of it (i think)
 
 
-% when we move, we move to the target node in the next time step. Make stuff that keeps node the same false.
-make_true(TStep+1, truck(TID,TN)) :- 
+% when we move, we move to the target node in the next time step.
+make_true(TStep+1, truck(TID,TN)) :-
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
-make_false(TStep+1, truck(TID,N)) :- 
+% Make stuff that keeps node the same false.
+make_false(TStep+1, truck(TID,N)) :-
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
 
-% when we load, our cargo increases, the node cargo decreases. Make stuff that keeps cargo the same false.
-make_true(TStep+1, cargo(TID, Curr+1, Max)) :- 
-  do(load(N), TID, TStep), 
+% when we load, our cargo increases, the node cargo decreases.
+make_true(TStep+1, cargo(TID, Curr+1, Max)) :-
+  do(load(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, cargo(TID, Curr, Max)).
-make_false(TStep+1, cargo(TID, Curr, Max)) :- 
-  do(load(N), TID, TStep), 
-  state(TStep, truck(TID, N)),
-  state(TStep, cargo(TID, Curr, Max)).
-make_true(TStep+1, warehouse(N, Curr-1)) :- 
+make_true(TStep+1, warehouse(N, Curr-1)) :-
   do(load(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, warehouse(N, Curr)) .
-make_false(TStep+1, warehouse(N, Curr)) :- 
-  do(load(N), TID, TStep), 
+% Make stuff that keeps cargo the same false.
+make_false(TStep+1, cargo(TID, Curr, Max)) :-
+  do(load(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_false(TStep+1, warehouse(N, Curr)) :-
+  do(load(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, warehouse(N, Curr)).
 
-% when we unload, our cargo decreases, the node required cargo increases. Make stuff that keeps cargo the same false.
-make_true(TStep+1, cargo(TID, Curr-1, Max)) :- 
+% when we unload, our cargo decreases, the node required cargo increases.
+make_true(TStep+1, cargo(TID, Curr-1, Max)) :-
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, cargo(TID, Curr, Max)).
-make_false(TStep+1, cargo(TID, Curr, Max)) :- 
-  do(unload(N), TID, TStep),
-  state(TStep, truck(TID, N)),
-  state(TStep, cargo(TID, Curr, Max)).
-make_true(TStep+1, deliver(N, Req-1)) :- 
+make_true(TStep+1, deliver(N, Req-1)) :-
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, deliver(N, Req)) .
-make_false(TStep+1, deliver(N, Req)) :- 
+% Make stuff that keeps cargo the same false.
+make_false(TStep+1, cargo(TID, Curr, Max)) :-
+  do(unload(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, cargo(TID, Curr, Max)).
+make_false(TStep+1, deliver(N, Req)) :-
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, deliver(N, Req)) .
@@ -212,16 +216,16 @@ Explanation (max 100 words):
 :- do(move(TN), TID, TStep), state(TStep, truck(TID, N)), not edge(N, TN).
 % we cannot move to an occupied node
 :- do(move(TN), TIDA, TStep), do(move(TN), TIDB, TStep), TIDA != TIDB.
-:- do(move(TN), TIDA, TStep), 
-    not do(move, TIDB, TStep), 
+:- do(move(TN), TIDA, TStep),
+    not do(move, TIDB, TStep),
     state(TStep, truck(TIDB, TN)),
     TIDA != TIDB.
 % we cannot move through a busy edge
 % helper rule
 busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID, N)) .
-:-  do(move(N), TIDA, TStep), 
-    busy_edge(N, TN, TIDB, TStep), 
-    TIDA != TIDB, 
+:-  do(move(N), TIDA, TStep),
+    busy_edge(N, TN, TIDB, TStep),
+    TIDA != TIDB,
     state(TStep, truck(TIDA, TN)).
 
 % can only load at warehouse
@@ -233,7 +237,7 @@ busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID
 
 % can only unload at deliver, this constraint breaks because there's two unload places!!
 :- do(unload(N), TID, TStep), not deliver_location(N).
-% can only unload when deliver needs it 
+% can only unload when deliver needs it
 :- do(unload(N), _, TStep), state(TStep, deliver(N, R)), R < 0 .
 % can only unload when we have package to unload
 :- do(unload(N), TID, TStep), state(TStep, cargo(TID, Curr, _)), Curr == 0 .
@@ -251,8 +255,11 @@ GOAL CONDITIONS:
 Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
+% all the delivery locations are satisfied
 all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
+% all the trucks are parked in one of the available parking spots
 all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
+% all the trucks are empty
 all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
 
 
@@ -261,8 +268,8 @@ all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
 % all_reachable: that all trucks can reach one charging station, TODO
 
 
-goal_reached(T) :- 
-  time(T), 
+goal_reached(T) :-
+  time(T),
   all_delivered(T),
   all_parked(T),
   all_empty(T) .
