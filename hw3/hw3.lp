@@ -373,11 +373,44 @@ Explanation (max 100 words):
 
 We only care about what we do and when. The do predicate captures this, so we
 only show the do/3 predicate. We found that most rules fit well in the headings
-provided.
+provided. We also provide a python pretty printing script that summarizes the
+actions taken for each truck at each timestep in a tabular fashion.
 
 *%
 
 #show do/3.
+
+#script (python)
+
+import clingo
+
+def on_model(model):
+    actions = dict()
+
+    for atom in model.symbols(atoms=True):
+        if atom.name == "do":
+            time = atom.arguments[-1].number
+            action = str(atom.arguments[0])
+            truck = f"truck {atom.arguments[1]}"
+            if time not in actions:
+                actions[time] = dict()
+            actions[time][truck] = action
+
+    time_steps = [time for time in actions]
+    time_steps.sort()
+    print("Pretty printed answer set:")
+    print(f"{'Time step│':10}\t{'Truck 1':12}\t{'Truck 2':12}\t{'Truck 3':12}")
+    print("─────────┼"+"─"*48)
+    for time in time_steps:
+        truck1 = actions[time]["truck 1"]
+        truck2 = actions[time]["truck 2"]
+        truck3 = actions[time]["truck 3"]
+        print(f"{time:9}│\t{truck1:12}\t{truck2:12}\t{truck3:12}")
+
+def main(prg):
+    prg.ground([("base", [])])
+    prg.solve(on_model=on_model)
+#end.
 %*
 THE END
 *%
