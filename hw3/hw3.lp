@@ -199,10 +199,24 @@ make_false(TStep+1, deliver(N, Req)) :-
   state(TStep, deliver(N, Req)) .
 
 
-% when we move, battery decreases, TODO
-
-
 % when we charge, battery increases, TODO
+make_true(TStep+1, battery(TID, Curr+1)) :-
+  do(charge(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, battery(TID, Curr)).
+make_false(TStep+1, battery(TID, Curr)) :-
+  do(charge(N), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, battery(TID, Curr)).
+% when we move, battery decreases
+make_true(TStep+1, battery(TID, Curr-1)) :-
+  do(move(TN), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, battery(TID, Curr)).
+make_false(TStep+1, battery(TID, Curr)) :-
+  do(move(TN), TID, TStep),
+  state(TStep, truck(TID, N)),
+  state(TStep, battery(TID, Curr)).
 
 
 %*
@@ -221,8 +235,9 @@ Explanation (max 100 words):
     state(TStep, truck(TIDB, TN)),
     TIDA != TIDB.
 % we cannot move through a busy edge
-% helper rule
+% an edge is busy when a truck is using it to move
 busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID, N)) .
+% can now use this helper rule to define our constraint.
 :-  do(move(N), TIDA, TStep),
     busy_edge(N, TN, TIDB, TStep),
     TIDA != TIDB,
@@ -230,6 +245,7 @@ busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID
 
 % can only load at warehouse
 :- do(load(N), TID, TStep), not warehouse_location(N).
+:- do(load(N), TID, TStep), not state(TStep, truck(TID, N)) .
 % can only load when warehouse not empty
 :- do(load(N), _, TStep), state(TStep, warehouse(N, C)), C < 1 .
 % can only load when we have space to do so
@@ -237,14 +253,19 @@ busy_edge(N, TN, TID, TStep) :- do(move(TN), TID, TStep), state(TStep, truck(TID
 
 % can only unload at deliver, this constraint breaks because there's two unload places!!
 :- do(unload(N), TID, TStep), not deliver_location(N).
+:- do(unload(N), TID, TStep), not state(TStep, truck(TID, N)) .
 % can only unload when deliver needs it
 :- do(unload(N), _, TStep), state(TStep, deliver(N, R)), R < 0 .
 % can only unload when we have package to unload
 :- do(unload(N), TID, TStep), state(TStep, cargo(TID, Curr, _)), Curr == 0 .
 
-% can only charge at station, TODO
-% can only charge if battery is not full, TODO
-% cannot move if battery == 0, TODO
+% can only charge at station
+:- do(charge(N), TID, TStep), not station(N) .
+:- do(charge(N), TID, TStep), not state(TStep, truck(TID, N)) .
+% can only charge if battery is not full
+:- do(charge(N), TID, TStep), state(TStep, battery(TID, C)), C > max_charge .
+% cannot move if battery == 0
+:- do(move(N), TID, TStep), state(TStep, battery(TID, C)), C == 0 . 
 
 
 
@@ -262,18 +283,42 @@ all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
 % all the trucks are empty
 all_empty(T) :- time(T), state(T, cargo(TID, 0, _)) : truck_id(TID).
 
-
-% helper for station reachable by truck with current charge, TODO
-
-% all_reachable: that all trucks can reach one charging station, TODO
-
-
-goal_reached(T) :-
+% almost all our constraints are satisfied except the.
+goal_almost_reached(T) :-
   time(T),
   all_delivered(T),
   all_parked(T),
   all_empty(T) .
 
+% what is the closest station for a given node
+closest_station(X, X, 0) :- station(X) .
+closest_station(X, Z, D+1) :- 
+    node(D+1),
+    closest_station(X, Y, D), 
+    edge(Y, Z), 
+    not closest_station(X, Z, W) : node(W), 
+    W <= D .
+
+% helper for station reachable by truck with current charge at current TStep
+station_reachable(TID, TStep) :- 
+    goal_almost_reached(TStep), % only compute this when close to solving
+    state(TStep, battery(TID, C)), % given battery
+    state(TStep, truck(TID, Z)), % of given truck
+    closest_station(N, Z, D), % given station is D steps away
+    C >= D . % and we have enough charge to cover this distance
+
+% that all trucks can reach a charging station
+all_reachable(T) :-
+    time(T),
+    station_reachable(TID, T) : truck_id(TID) .
+
+% all our constraints are satisfied.
+goal_reached(T) :-
+    time(T),
+    goal_almost_reached(T),
+    all_reachable(T) .
+
+% 
 :- max_time(M), not goal_reached(M).
 :- max_time(M), goal_reached(T), time(T), T < M .
 
@@ -298,10 +343,6 @@ Explanation (max 100 words):
 [WRITE YOUR EXPLANATION HERE]
 *%
 
-
-
-
-% tests
 #show do/3.
 %*
 THE END
