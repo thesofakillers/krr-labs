@@ -83,7 +83,7 @@ ACTIONS:
 [EXPLAIN YOUR CODE USING SHORT INLINE COMMENTS]
 *%
 % here we declare the possible actions and their inputs
-% the do predicate (lower) handles when and who does what
+% the do/3 predicate (lower) handles when and who does what
 % wait is therefore 0-ary
 action(wait).
 % move to a target node
@@ -101,8 +101,6 @@ fluent(warehouse(N, Curr)) :- warehouse_location(N), warehouse_capacity(Curr).
 fluent(cargo(TID,Curr,Max)) :- truck_id(TID), warehouse_capacity(Curr), warehouse_capacity(Max).
 fluent(deliver(N,Req)) :- deliver_location(N), warehouse_capacity(Req).
 fluent(battery(TID,Curr)) :- truck_id(TID),Curr = 0..max_charge.
-
-
 
 %*
 GENERATE A SEQUENCE OF ACTIONS:
@@ -148,7 +146,14 @@ SUBSEQUENT STATES OF THE WORLD:
 - Encode the subsequent states, based on the actions taken
 
 Explanation (max 100 words):
-[WRITE YOUR EXPLANATION HERE]
+
+A future state is defined by what action(s) we do at the present timestep. This
+idea is encapsulated by the do/3 predicate. To save the state, we make use of
+the state/2 predicate, which keeps track of fluents through time. Because we
+work with fluents, for every action we must define both what a valid state and
+an invalid state would be for this action. This corresponds to the usage of the
+make_true/2 and make_false/2 predicates.
+
 *%
 % do not need to describe what happens with wait because fluents take care of it (i think)
 
@@ -224,7 +229,19 @@ RESTRICTIONS ON THE ACTIONS:
 - Restrict the actions taken by the trucks, based on the state of the world
 
 Explanation (max 100 words):
-[WRITE YOUR EXPLANATION HERE]
+
+Here we use rules without heads to express constraints on our actions, such
+that the body must be false. In particular we define the following constraints:
+
+- we can only _move_ to adjacent nodes
+- we cannot _move_ to an occupied node
+- we cannot _move_ through a busy edge
+- we can only _load_ at a warehouse
+- we can only _unload_ at a delivery location
+- we can only _charge_ at a charging station
+
+Where the _action_ is expressed between underscores.
+
 *%
 % we can only move to adjacent nodes
 :- do(move(TN), TID, TStep), state(TStep, truck(TID, N)), not edge(N, TN).
@@ -274,7 +291,16 @@ GOAL CONDITIONS:
 - Constraints that express that the goal must be reached
 
 Explanation (max 100 words):
-[WRITE YOUR EXPLANATION HERE]
+
+We have reached our goal when all the delivery requirements are met, the trucks
+are all empty, they are parked in one of the parking spots and they all have
+enough charge to reach the closest charging station. We make use of conditional
+literals to express this "for all <instance>" notion. We resort to helper
+predicates to determine the closest parking station and whether it is reachable
+based on our charge. As an optimization we only check the reachability
+constraint when all other constraints are satisfied, as we found this sped up
+result computation.
+
 *%
 % all the delivery locations are satisfied
 all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
@@ -318,8 +344,9 @@ goal_reached(T) :-
     goal_almost_reached(T),
     all_reachable(T) .
 
-% 
+% We require that we reach the goal at the end
 :- max_time(M), not goal_reached(M).
+% Once we reached the goal, stop the clock
 :- max_time(M), goal_reached(T), time(T), T < M .
 
 %*
@@ -328,7 +355,10 @@ OPTIMIZATION:
   number of time steps
 
 Explanation (max 100 words):
-[WRITE YOUR EXPLANATION HERE]
+
+Very simply, we want to find the shortest sequence and we can do this by
+minimizing the number of time steps.
+
 *%
 #minimize {1, T : time(T) } .
 
@@ -340,7 +370,11 @@ OPTIONAL: ADDITIONAL RULES
   headings, put it here.
 
 Explanation (max 100 words):
-[WRITE YOUR EXPLANATION HERE]
+
+We only care about what we do and when. The do predicate captures this, so we
+only show the do/3 predicate. We found that most rules fit well in the headings
+provided.
+
 *%
 
 #show do/3.
