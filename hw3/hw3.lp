@@ -17,7 +17,7 @@ INPUT REPRESENTATION:
 *%
 
 % Represent the nodes and edges of the map using node/1 and edge/2.
-% there are 13 nodes
+% there are 13 nodes, numbered top to bottom, left to right in zig-zag fashion
 node(1..13).
 % and they are connected as such
 edge(1,3).
