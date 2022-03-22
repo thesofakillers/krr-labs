@@ -371,10 +371,18 @@ OPTIONAL: ADDITIONAL RULES
 
 Explanation (max 100 words):
 
-We only care about what we do and when. The do predicate captures this, so we
+We only care about what we do and when. The do/3 predicate captures this, so we
 only show the do/3 predicate. We found that most rules fit well in the headings
-provided. We also provide a python pretty printing script that summarizes the
-actions taken for each truck at each timestep in a tabular fashion.
+provided. 
+
+We also provide a python pretty-printing script.
+Ensure to run using the provided clingo conda environment:
+`conda create -n potassco -c conda-forge clingo`
+You can also just comment out the #script-#end. block if you are not interested
+in pretty-printing.
+
+Our script takes approximately 140 seconds to run on a consumer laptop from
+2017.
 
 *%
 
