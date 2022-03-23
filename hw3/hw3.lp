@@ -229,7 +229,7 @@ RESTRICTIONS ON THE ACTIONS:
 Explanation (max 100 words):
 
 Here we constrain our possible actions using rules without heads. 
-In particular, we define the following constraints:
+In particular:
 
 - we can only _move_ to adjacent nodes
 - we cannot _move_ to an occupied node or a busy edge
