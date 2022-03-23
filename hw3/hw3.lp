@@ -155,13 +155,11 @@ an invalid state would be for this action. This corresponds to the usage of the
 make_true/2 and make_false/2 predicates.
 
 *%
-% do not need to describe what happens with wait because fluents take care of it (i think)
-
-
+% wait action keeps everything the same so it is taken care of by fluents
 % when we move, we move to the target node in the next time step.
 make_true(TStep+1, truck(TID,TN)) :-
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
-% Make stuff that keeps node the same false.
+% Make states that keeps node the same false.
 make_false(TStep+1, truck(TID,N)) :-
   do(move(TN), TID, TStep), state(TStep, truck(TID, N)).
 
@@ -174,7 +172,7 @@ make_true(TStep+1, warehouse(N, Curr-1)) :-
   do(load(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, warehouse(N, Curr)) .
-% Make stuff that keeps cargo the same false.
+% Make states that keeps cargo the same false.
 make_false(TStep+1, cargo(TID, Curr, Max)) :-
   do(load(N), TID, TStep),
   state(TStep, truck(TID, N)),
@@ -193,7 +191,7 @@ make_true(TStep+1, deliver(N, Req-1)) :-
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
   state(TStep, deliver(N, Req)) .
-% Make stuff that keeps cargo the same false.
+% Make states that keeps cargo the same false.
 make_false(TStep+1, cargo(TID, Curr, Max)) :-
   do(unload(N), TID, TStep),
   state(TStep, truck(TID, N)),
@@ -230,15 +228,17 @@ RESTRICTIONS ON THE ACTIONS:
 
 Explanation (max 100 words):
 
-Here we use rules without heads to express constraints on our actions, such
-that the body must be false. In particular we define the following constraints:
+Here we constrain our possible actions using rules without heads. 
+In particular, we define the following constraints:
 
 - we can only _move_ to adjacent nodes
-- we cannot _move_ to an occupied node
-- we cannot _move_ through a busy edge
-- we can only _load_ at a warehouse
-- we can only _unload_ at a delivery location
+- we cannot _move_ to an occupied node or a busy edge
+- we can only _load_ at a warehouse and it still has packages
+- we can only _load_ if truck still has space to load
+- we can only _unload_ at a delivery location and it still requires packages
+- we can only _unload_ if truck has nonzero loaded packages
 - we can only _charge_ at a charging station
+- we cannot _move_ with an empty battery
 
 Where the _action_ is expressed between underscores.
 
@@ -382,7 +382,7 @@ You can also just comment out the #script-#end. block if you are not interested
 in pretty-printing.
 
 Our script takes approximately 140 seconds to run on a consumer laptop from
-2017.
+2017 and approximately 85 seconds on M1 Mac from 2020.
 
 *%
 
