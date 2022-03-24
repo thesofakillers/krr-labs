@@ -18,7 +18,8 @@ INPUT REPRESENTATION:
 
 % Represent the nodes and edges of the map using node/1 and edge/2.
 % there are 13 nodes, numbered top to bottom, left to right in zig-zag fashion
-node(1..13).
+#const num_nodes = 13.
+node(1..num_nodes).
 % and they are connected as such
 edge(1,3).
 edge(1,4).
@@ -48,7 +49,8 @@ edge(X,Y) :- edge(Y,X), node(Y), node(X).
 #const max_charge = 10.
 
 % truck ids and warehouse capacity
-truck_id(1..3).
+#const num_trucks = 3.
+truck_id(1..num_trucks).
 warehouse_capacity(0..5).
 
 % charging station at node 1 and 2
@@ -127,9 +129,9 @@ INITIAL STATE:
 *%
 
 % initial state of trucks
-state(1, truck(TID, 10+TID)) :- truck_id(TID).
+state(1, truck(TID, (num_nodes-num_trucks)+TID)) :- truck_id(TID).
 % warehouse at node 10 with 5 packages
-state(1, warehouse(10, 5)).
+state(1, warehouse(L, 5)) :- warehouse_location(L).
 % (position, number of packages required) of deliver goal
 state(1, deliver(L, 2)) :- deliver_location(L).
 % cargo of truck id, current load, max load
@@ -303,7 +305,7 @@ result computation.
 
 *%
 % all the delivery locations are satisfied
-all_delivered(T) :- time(T), state(T, deliver(3, 0)), state(T, deliver(6, 0)) .
+all_delivered(T) :- time(T), state(T, deliver(L, 0)) : deliver_location(L) .
 % all the trucks are parked in one of the available parking spots
 all_parked(T):- time(T), state(T, truck(_, N)) : parking(N) .
 % all the trucks are empty
@@ -381,7 +383,7 @@ Ensure to run using the provided clingo conda environment:
 You can also just comment out the #script-#end. block if you are not interested
 in pretty-printing.
 
-Our script takes approximately 140 seconds to run on a consumer laptop from
+Our script takes approximately 150 seconds to run on a consumer laptop from
 2017 and approximately 85 seconds on M1 Mac from 2020.
 
 *%
