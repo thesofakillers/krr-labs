@@ -128,7 +128,7 @@ INITIAL STATE:
 [EXPLAIN YOUR CODE USING SHORT INLINE COMMENTS]
 *%
 
-% initial state of trucks
+% initial state of trucks, truck 1, 2 and 3 at parking 11, 12, and 13
 state(1, truck(TID, (num_nodes-num_trucks)+TID)) :- truck_id(TID).
 % warehouse at node 10 with 5 packages
 state(1, warehouse(L, 5)) :- warehouse_location(L).
