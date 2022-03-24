@@ -129,7 +129,7 @@ INITIAL STATE:
 *%
 
 % initial state of trucks, truck 1, 2 and 3 at parking 11, 12, and 13
-state(1, truck(TID, P)) :- truck_id(TID), parking(P), P-TID = (num_nodes - num_trucks).
+state(1, truck(TID, (num_nodes-num_trucks)+TID)) :- truck_id(TID).
 % warehouse at node 10 with 5 packages
 state(1, warehouse(L, 5)) :- warehouse_location(L).
 % (position, number of packages required) of deliver goal
