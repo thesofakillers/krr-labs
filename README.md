@@ -1,8 +1,18 @@
 # krr-labs
 
-Assignments for KRR - UvA MSc AI
+Assignments for the "Knowledge Representation Reasoning" course for my MSc in AI.
+I am omitting my University name for searchability reasons. My MSc university can be found on my LinkedIn or CV.
 
-## Notes
+## Assignments:
 
-- [useful for hw2 part c)](https://canvas.uva.nl/courses/28686/files/6268590?module_item_id=1224680)
-  - this is a notebook: _checking uniqueness of solutions in ASP_
+More details for each assignment can be found in the respective folder.
+In general, the following was covered
+
+1. Assignment 1
+    - Propositional Logic and Conjunctive Normal Form
+    - SAT solvers
+    - Answer Set Programming
+2. Assignment 2
+    - Solving Sudoku variants using SAT and Answer Set Programming
+3. Assignment 3
+    - Using Answer Set Programming for solving a multi-truck delivery planning problem
